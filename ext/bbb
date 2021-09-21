@@ -1,0 +1,48 @@
+#!/bin/bash
+
+COLUMN=bbb	# Name of the column
+COLOR=green	# By default, everything is OK
+MSG="BBB Services Status\r\n\r\n"
+CMD="sudo $(which bbb-conf) --status"
+
+# Run command CMD and split output into Variables
+{
+    IFS=$'\n' read -r -d '' CAPTURED_STDERR;
+    IFS=$'\n' read -r -d '' CAPTURED_STDOUT;
+} < <((printf '\0%s\0' "$($CMD)" 1>&2) 2>&1)
+
+# Analyze captured STDERR
+if [ ! -z "${CAPTURED_STDERR}" ]; then
+    COLOR=yellow
+    while read line; do 
+#       echo "yellow $line" # DEBUG
+        MSG=$(echo -e "${MSG}&yellow $line\r\n")
+#	echo "${MSG}" # DEBUG
+    done < <(echo "${CAPTURED_STDERR}")
+    MSG=$(echo -e "${MSG}\r\n")
+fi
+
+# Analyze captured STDOUT
+while read line; do 
+    if echo "$line" | grep -q active; then
+#       echo "green $line" # DEBUG
+        MSG=$(echo -e "${MSG}&green $line\r\n")
+#	echo "${MSG}" # DEBUG
+    else
+#       echo "red $line" # DEBUG
+        MSG=$(echo -e "${MSG}&red $line\r\n")
+	COLOR=red
+    fi
+done < <(echo "${CAPTURED_STDOUT}" | sed -e 's/►/\&blacktriangleright;/g' -e 's/✔/\&#10004;/g' -e 's/—/\&ndash;/g' -e 's/✗/\&#10007;/g')
+
+#echo $COLOR # DEBUG
+#echo -en "${MSG}" # DEBUG
+
+# Tell Xymon about it
+$XYMON $XYMSRV "status $MACHINE.$COLUMN $COLOR `date`
+
+${MSG}
+"
+
+exit 0
+
