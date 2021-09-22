@@ -3,13 +3,18 @@
 COLUMN=bbb	# Name of the column
 COLOR=green	# By default, everything is OK
 MSG="BBB Services Status\r\n\r\n"
-CMD="sudo $(which bbb-conf) --status"
+CMD="bbb-conf"
+WHICHCMD="which $CMD"
+SUDOCMD="sudo $(${WHICHCMD}) --status"
+
+# Test for bbb-conf command; then run actual script
+if ${WHICHCMD} > /dev/null 2>&1; then
 
 # Run command CMD and split output into Variables
 {
     IFS=$'\n' read -r -d '' CAPTURED_STDERR;
     IFS=$'\n' read -r -d '' CAPTURED_STDOUT;
-} < <((printf '\0%s\0' "$($CMD)" 1>&2) 2>&1)
+} < <((printf '\0%s\0' "$(${SUDOCMD})" 1>&2) 2>&1)
 
 # Analyze captured STDERR
 if [ ! -z "${CAPTURED_STDERR}" ]; then
@@ -37,6 +42,12 @@ done < <(echo "${CAPTURED_STDOUT}" | sed -e 's/►/\&blacktriangleright;/g' -e '
 
 #echo $COLOR # DEBUG
 #echo -en "${MSG}" # DEBUG
+
+# Output a warning if CMD was not found
+else
+    COLOR=yellow
+    MSG=$(echo -e "${MSG}&yellow Command \"$CMD\" not found.\r\n")
+fi
 
 # Tell Xymon about it
 $XYMON $XYMSRV "status $MACHINE.$COLUMN $COLOR `date`
